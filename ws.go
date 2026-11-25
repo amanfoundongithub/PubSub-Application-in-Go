@@ -106,7 +106,7 @@ func(s* Server) wsHandler(w http.ResponseWriter, r *http.Request) {
 		s.broker.Publish(Message{
 			Topic: topic,
 			Sender: sender,
-			Body: fmt.Sprintf("%s: %s", sender, in.Body),
+			Body: in.Body,
 		})
 	}
 	<- writeDone

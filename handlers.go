@@ -67,7 +67,7 @@ func(s* Server) streamHandler(w http.ResponseWriter, r* http.Request) {
 	}
 
 	subID := fmt.Sprintf("%s-%p", r.RemoteAddr, r)
-	sub := s.broker.Subscribe(topic, subID, 16)
+	sub, _ := s.broker.Subscribe(topic, subID, "sse-client", 16)
 	defer s.broker.Unsubscribe(topic, subID)
 
 	w.Header().Set("Content-Type", "text/event-stream")

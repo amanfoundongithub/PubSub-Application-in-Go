@@ -49,7 +49,7 @@ func(s* Server) wsHandler(w http.ResponseWriter, r *http.Request) {
 	defer conn.CloseNow()
 
 	subID := fmt.Sprintf("ws-%s-%p", sender, conn)
-	sub := s.broker.Subscribe(topic, subID, 32)
+	sub, _ := s.broker.Subscribe(topic, subID, sender, 32)
 	past := s.broker.History(topic)
 	defer s.broker.Unsubscribe(topic, subID)
 
@@ -104,6 +104,7 @@ func(s* Server) wsHandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		s.broker.Publish(Message{
+			Kind: "chat",
 			Topic: topic,
 			Sender: sender,
 			Body: in.Body,

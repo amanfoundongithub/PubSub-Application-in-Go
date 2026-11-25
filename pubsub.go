@@ -95,28 +95,50 @@ func (b *Broker) MemberCount(topic string) int {
 
 // Unsubscribe to broker
 func (b *Broker) Unsubscribe(topic, id string) {
-
 	b.mu.Lock()
-	defer b.mu.Unlock()
-
 	subs, ok := b.topics[topic]
 	if !ok {
+		b.mu.Unlock()
 		return
 	}
-
-	if sub, exists := subs[id]; exists {
-		delete(subs, id)
-		close(sub.Ch)
+	sub, exists := subs[id]
+	if !exists {
+		b.mu.Unlock()
+		return
 	}
-
+	delete(subs, id)
+	close(sub.Ch)
 	if len(subs) == 0 {
 		delete(b.topics, topic)
 	}
-
+	delete(b.members[topic], id)
+	count := len(b.members[topic])
+	if count == 0 {
+		delete(b.members, topic)
+	}
+	b.mu.Unlock()
+	if count > 0 {
+		b.Publish(Message{
+			Kind:        "system",
+			Topic:       topic,
+			Sender:      "system",
+			Body:        fmt.Sprintf("%s left #%s", sub.User, topic),
+			MemberCount: count,
+		})
+	}
 }
 
 // Publish a message to the broker
 func (b *Broker) Publish(msg Message) {
+	if msg.Kind == "" {
+		msg.Kind = "chat"
+	}
+	if msg.SentAt == "" {
+		msg.SentAt = time.Now().UTC().Format(time.RFC3339)
+	}
+	if msg.Sender == "" {
+		msg.Sender = "system"
+	}
 
 	if msg.SentAt == "" {
 		msg.SentAt = time.Now().UTC().Format(time.RFC3339)
@@ -125,14 +147,17 @@ func (b *Broker) Publish(msg Message) {
 	if msg.Sender == "" {
 		msg.Sender = "system"
 	}
-
 	b.mu.Lock()
-	hist := append(b.history[msg.Topic], msg)
-	if len(hist) > b.historyLimit {
-		hist = hist[len(hist)-b.historyLimit:]
+	if msg.MemberCount == 0 {
+		msg.MemberCount = len(b.members[msg.Topic])
 	}
-	b.history[msg.Topic] = hist
-
+	if msg.Kind == "chat" {
+		hist := append(b.history[msg.Topic], msg)
+		if len(hist) > b.historyLimit {
+			hist = hist[len(hist)-b.historyLimit:]
+		}
+		b.history[msg.Topic] = hist
+	}
 	subsMap := b.topics[msg.Topic]
 	targets := make([]*Subscriber, 0, len(subsMap))
 	for _, sub := range subsMap {

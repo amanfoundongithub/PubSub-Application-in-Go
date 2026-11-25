@@ -1,40 +1,29 @@
-package main 
+package main
 
 import (
 	"context"
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
 )
 
-type ChatMessage struct {
-	Topic  string `json:"topic"`
-	Body   string `json:"body"`
-	Sender string `json:"sender"`
-	SentAt string `json:"sent_at"`
-}
-
-type incomingChat struct {
-	Body string `json:"body"`
-}
-
-func(s* Server) wsHandler(w http.ResponseWriter, r *http.Request) {
-
+func (s *Server) wsHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Only GET method is supported on this handler", http.StatusMethodNotAllowed)
 		return
 	}
 
-	topic := r.URL.Query().Get("topic")
+	topic := strings.TrimSpace(r.URL.Query().Get("topic"))
 	if topic == "" {
 		http.Error(w, "Please provide a topic parameter in the URL", http.StatusBadRequest)
-		return 
+		return
 	}
 
-	sender := r.URL.Query().Get("user")
+	sender := strings.TrimSpace(r.URL.Query().Get("user"))
 	if sender == "" {
 		sender = "anonymous"
 	}
@@ -44,7 +33,7 @@ func(s* Server) wsHandler(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		log.Printf("WebSocket accept error: %v", err)
-		return 
+		return
 	}
 	defer conn.CloseNow()
 
@@ -70,7 +59,7 @@ func(s* Server) wsHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			return true
 		}
-		
+
 		for _, histMsg := range past {
 			if !sendOne(histMsg) {
 				return
@@ -79,9 +68,9 @@ func(s* Server) wsHandler(w http.ResponseWriter, r *http.Request) {
 
 		for {
 			select {
-			case <- ctx.Done():
+			case <-ctx.Done():
 				return
-			case msg, open := <- sub.Ch:
+			case msg, open := <-sub.Ch:
 				if !open {
 					return
 				}
@@ -90,27 +79,22 @@ func(s* Server) wsHandler(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-
 	}()
 
 	for {
-		var in incomingChat
+		var in WSIncomingMessage
 		err := wsjson.Read(ctx, conn, &in)
 		if err != nil {
 			cancel()
+			<-writeDone
 			return
 		}
-		if in.Body == "" {
+
+		body := strings.TrimSpace(in.Body)
+		if body == "" || len(body) > maxMessageBodyLen {
 			continue
 		}
-		s.broker.Publish(Message{
-			Kind: "chat",
-			Topic: topic,
-			Sender: sender,
-			Body: in.Body,
-		})
-	}
-	<- writeDone
-	_ = conn.Close(websocket.StatusNormalClosure, "bye")
 
+		s.broker.Publish(NewChatMessage(topic, sender, body))
+	}
 }

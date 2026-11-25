@@ -6,16 +6,6 @@ import(
 	"net/http"
 )
 
-type Server struct {
-	broker *Broker
-}
-
-func NewServer(broker *Broker) *Server {
-	return &Server{
-		broker: broker,
-	}
-}
-
 func(s* Server) publishHandler(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != http.MethodPost {

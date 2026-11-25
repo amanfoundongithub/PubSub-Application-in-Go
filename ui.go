@@ -5,6 +5,7 @@ import(
 	"net/http"
 )
 
+//go:embed index.html
 var indexHTML []byte
 
 func(s* Server) indexHandler(w http.ResponseWriter,r *http.Request) {

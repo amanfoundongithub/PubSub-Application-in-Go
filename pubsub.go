@@ -86,6 +86,13 @@ func (b *Broker) History(topic string) []Message {
 	return out
 }
 
+// Member count
+func (b *Broker) MemberCount(topic string) int {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	return len(b.members[topic])
+}
+
 // Unsubscribe to broker
 func (b *Broker) Unsubscribe(topic, id string) {
 

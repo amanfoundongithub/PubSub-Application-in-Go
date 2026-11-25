@@ -101,3 +101,13 @@ func NewBroker() *Broker {
 		historyLimit: defaultHistoryLimit,
 	}
 }
+
+type Server struct {
+	broker *Broker
+}
+
+func NewServer(broker *Broker) *Server {
+	return &Server{
+		broker: broker,
+	}
+}

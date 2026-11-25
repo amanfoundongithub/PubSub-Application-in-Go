@@ -34,7 +34,7 @@ func(s* Server) wsHandler(w http.ResponseWriter, r *http.Request) {
 		return 
 	}
 
-	sender := r.URL.Query().Get("sender")
+	sender := r.URL.Query().Get("user")
 	if sender == "" {
 		sender = "anonymous"
 	}

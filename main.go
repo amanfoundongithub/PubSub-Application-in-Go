@@ -32,6 +32,7 @@ func main() {
 	mux.HandleFunc("/publish", srv.publishHandler)
 	mux.HandleFunc("/stream", srv.streamHandler)
 	mux.HandleFunc("/ws", srv.wsHandler)
+	mux.HandleFunc("/", srv.indexHandler)
 
 	httpServer := &http.Server{
 		Addr: ":8092",

@@ -2,66 +2,8 @@ package main
 
 import (
 	"fmt"
-	"sync"
 	"time"
 )
-
-const defaultHistoryLimit = 20
-
-type Message struct {
-	Kind        string `json:"kind"`
-	Topic       string `json:"topic"`
-	Body        string `json:"body"`
-	Sender      string `json:"sender"`
-	SentAt      string `json:"sent_at"`
-	MemberCount int    `json:"member_count,omitempty"`
-}
-
-type Subscriber struct {
-	ID     string
-	User   string
-	Ch     chan Message
-	mu     sync.Mutex
-	closed bool
-}
-
-type Broker struct {
-	mu           sync.RWMutex
-	topics       map[string]map[string]*Subscriber
-	members      map[string]map[string]string
-	history      map[string][]Message
-	historyLimit int
-}
-
-func NewBroker() *Broker {
-	return &Broker{
-		topics:       make(map[string]map[string]*Subscriber),
-		members:      make(map[string]map[string]string),
-		history:      make(map[string][]Message),
-		historyLimit: defaultHistoryLimit,
-	}
-}
-
-func (s *Subscriber) Close() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if !s.closed {
-		s.closed = true
-		close(s.Ch)
-	}
-}
-
-func (s *Subscriber) Send(msg Message) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.closed {
-		return
-	}
-	select {
-	case s.Ch <- msg:
-	default:
-	}
-}
 
 func (b *Broker) Subscribe(topic, id, user string, buffSize int) (*Subscriber, int) {
 	sub := &Subscriber{
@@ -78,6 +20,7 @@ func (b *Broker) Subscribe(topic, id, user string, buffSize int) (*Subscriber, i
 		b.topics[topic] = make(map[string]*Subscriber)
 	}
 	b.topics[topic][id] = sub
+
 	if b.members == nil {
 		b.members = make(map[string]map[string]string)
 	}
@@ -88,13 +31,8 @@ func (b *Broker) Subscribe(topic, id, user string, buffSize int) (*Subscriber, i
 	count := len(b.members[topic])
 	b.mu.Unlock()
 
-	b.Publish(Message{
-		Kind:        "system",
-		Topic:       topic,
-		Sender:      "system",
-		Body:        fmt.Sprintf("%s joined #%s", user, topic),
-		MemberCount: count,
-	})
+	msg := NewSystemMessage(topic, fmt.Sprintf("%s joined #%s", user, topic), count)
+	b.Publish(msg)
 
 	return sub, count
 }
@@ -132,39 +70,36 @@ func (b *Broker) Unsubscribe(topic, id string) {
 	if len(subs) == 0 {
 		delete(b.topics, topic)
 	}
+
 	delete(b.members[topic], id)
 	count := len(b.members[topic])
 	if count == 0 {
 		delete(b.members, topic)
 	}
 	b.mu.Unlock()
+
 	if count > 0 {
-		b.Publish(Message{
-			Kind:        "system",
-			Topic:       topic,
-			Sender:      "system",
-			Body:        fmt.Sprintf("%s left #%s", sub.User, topic),
-			MemberCount: count,
-		})
+		msg := NewSystemMessage(topic, fmt.Sprintf("%s left #%s", sub.User, topic), count)
+		b.Publish(msg)
 	}
 }
 
 func (b *Broker) Publish(msg Message) {
 	if msg.Kind == "" {
-		msg.Kind = "chat"
+		msg.Kind = KindChat
 	}
 	if msg.SentAt == "" {
 		msg.SentAt = time.Now().UTC().Format(time.RFC3339)
 	}
 	if msg.Sender == "" {
-		msg.Sender = "system"
+		msg.Sender = string(KindSystem)
 	}
 
 	b.mu.Lock()
 	if msg.MemberCount == 0 {
 		msg.MemberCount = len(b.members[msg.Topic])
 	}
-	if msg.Kind == "chat" {
+	if msg.Kind == KindChat {
 		hist := append(b.history[msg.Topic], msg)
 		if len(hist) > b.historyLimit {
 			hist = hist[len(hist)-b.historyLimit:]

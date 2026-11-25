@@ -1,9 +1,15 @@
-package main 
+package main
 
 import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"time"
+	"os/signal"
+	"syscall"
+	"errors"
+	"context"
 )
 
 // Health controller
@@ -27,11 +33,33 @@ func main() {
 	mux.HandleFunc("/stream", srv.streamHandler)
 	mux.HandleFunc("/ws", srv.wsHandler)
 
-	addr := ":8092"
-	log.Printf("Starting server on http://localhost%s\n", addr)
-
-	if err := http.ListenAndServe(addr, mux); err != nil {
-		log.Fatalf("Server startup failed: %v", err)
+	httpServer := &http.Server{
+		Addr: ":8092",
+		Handler: mux,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
 	}
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		log.Printf("Starting server on http://localhost%s\n", httpServer.Addr)
+		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("Server startup failed: %v", err)
+		}
+	}()
+
+	sig := <- stop
+	log.Printf("Received signal %s, initiating graceful shutdown...", sig)
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer shutdownCancel()
+
+	if err := httpServer.Shutdown(shutdownCtx); err != nil {
+		log.Fatalf("graceful shutdown failed: %v", err)
+	}
+
+	log.Println("Server stopped cleanly.")
 
 }

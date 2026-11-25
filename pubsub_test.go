@@ -18,7 +18,7 @@ func TestPublishDeliversToMatchingTopicOnly(t *testing.T) {
 
 	select {
 	case joinMsg := <-goSub.Ch:
-		if joinMsg.Kind != "system" {
+		if joinMsg.Kind != KindSystem {
 			t.Fatalf("expected initial system join message on go-room, got %+v", joinMsg)
 		}
 	case <-time.After(time.Second):
@@ -27,19 +27,14 @@ func TestPublishDeliversToMatchingTopicOnly(t *testing.T) {
 
 	select {
 	case joinMsg := <-rustSub.Ch:
-		if joinMsg.Kind != "system" {
+		if joinMsg.Kind != KindSystem {
 			t.Fatalf("expected initial system join message on rust-room, got %+v", joinMsg)
 		}
 	case <-time.After(time.Second):
 		t.Fatal("timed out waiting for join message on rust-room")
 	}
 
-	broker.Publish(Message{
-		Kind:   "chat",
-		Topic:  "go-room",
-		Sender: "aman",
-		Body:   "hello go",
-	})
+	broker.Publish(NewChatMessage("go-room", "aman", "hello go"))
 
 	select {
 	case msg := <-goSub.Ch:
@@ -68,12 +63,7 @@ func TestHistoryBoundsAndDoesNotStoreSystemEvents(t *testing.T) {
 
 	totalPublished := defaultHistoryLimit + 5
 	for i := 1; i <= totalPublished; i++ {
-		broker.Publish(Message{
-			Kind:   "chat",
-			Topic:  "general",
-			Sender: "aman",
-			Body:   fmt.Sprintf("msg-%d", i),
-		})
+		broker.Publish(NewChatMessage("general", "aman", fmt.Sprintf("msg-%d", i)))
 	}
 
 	hist := broker.History("general")
@@ -155,12 +145,7 @@ func TestConcurrentPublishSubscribeUnsubscribeRace(t *testing.T) {
 		go func(pubIdx int) {
 			defer wg.Done()
 			for m := 0; m < 25; m++ {
-				broker.Publish(Message{
-					Kind:   "chat",
-					Topic:  "lobby",
-					Sender: fmt.Sprintf("pub-%d", pubIdx),
-					Body:   fmt.Sprintf("hello-%d", m),
-				})
+				broker.Publish(NewChatMessage("lobby", fmt.Sprintf("pub-%d", pubIdx), fmt.Sprintf("hello-%d", m)))
 			}
 		}(p)
 	}

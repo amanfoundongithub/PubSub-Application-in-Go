@@ -8,10 +8,12 @@ import (
 const defaultHistoryLimit = 20
 
 type Message struct {
+	Kind   string `json:"kind"`
 	Topic  string `json:"topic"`
 	Body   string `json:"body"`
 	Sender string `json:"sender"`
 	SentAt string `json:"sent_at"`
+	MemberCount int `json:"member_count,omitempty"`
 }
 
 type Subscriber struct {

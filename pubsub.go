@@ -50,6 +50,18 @@ func(b* Broker) Subscribe(topic, id string, buffSize int) *Subscriber {
 
 }
 
+// History
+func(b* Broker) History(topic string) []Message {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	src := b.history[topic]
+	out := make([]Message, len(src))
+	copy(out, src)
+	return out
+}
+
+
 // Unsubscribe to broker
 func(b* Broker) Unsubscribe(topic, id string) {
 

@@ -63,5 +63,30 @@ func(b* Broker) Unsubscribe(topic, id string) {
 	if len(subs) == 0 {
 		delete(b.topics, topic)
 	}
-	
+
+}
+
+// Publish a message to the broker
+func(b* Broker) Publish(msg Message) {
+
+	b.mu.RLock()
+	subsMap, ok := b.topics[msg.Topic]
+	if !ok {
+		b.mu.RUnlock()
+		return
+	}
+
+	targets := make([]*Subscriber, 0, len(subsMap))
+	for _, sub := range subsMap {
+		targets = append(targets, sub)
+	}
+	b.mu.RUnlock()
+
+	for _, sub := range targets {
+		select {
+			case sub.Ch <- msg:
+			default:
+		}
+	}
+
 }

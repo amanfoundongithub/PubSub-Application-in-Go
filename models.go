@@ -111,3 +111,17 @@ func NewServer(broker *Broker) *Server {
 		broker: broker,
 	}
 }
+
+type RoomStats struct {
+	Topic        string `json:"topic"`
+	Members      int    `json:"members"`
+	HistoryCount int    `json:"history_count"`
+}
+
+type BrokerStats struct {
+	ActiveRooms       int         `json:"active_rooms"`
+	TotalSubscribers  int         `json:"total_subscribers"`
+	PublishedMessages uint64      `json:"published_messages"`
+	DroppedMessages   uint64      `json:"dropped_messages"`
+	Rooms             []RoomStats `json:"rooms"`
+}

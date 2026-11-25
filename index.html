@@ -1,21 +1,51 @@
 <!doctype html>
 <html>
+
 <head>
   <meta charset="utf-8">
   <title>Go Pub/Sub Chat</title>
   <style>
-    body { font-family: system-ui, sans-serif; max-width: 600px; margin: 30px auto; padding: 0 16px; }
-    #log { background: #1e1e1e; color: #f0f0f0; padding: 12px; height: 320px; overflow-y: auto; border-radius: 6px; font-size: 13px; }
-    .controls { display: flex; gap: 8px; margin-bottom: 12px; }
-    input, select, button { padding: 8px; font-size: 14px; }
-    #msg { flex: 1; }
+    body {
+      font-family: system-ui, sans-serif;
+      max-width: 600px;
+      margin: 30px auto;
+      padding: 0 16px;
+    }
+
+    #log {
+      background: #1e1e1e;
+      color: #f0f0f0;
+      padding: 12px;
+      height: 320px;
+      overflow-y: auto;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+
+    .controls {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    input,
+    select,
+    button {
+      padding: 8px;
+      font-size: 14px;
+    }
+
+    #msg {
+      flex: 1;
+    }
   </style>
 </head>
+
 <body>
   <h2>Go Real-Time Chat</h2>
   <div class="controls">
-    <input id="user" value="aman" placeholder="Username" style="width: 120px;" />
-    <select id="room" onchange="joinRoom()">
+    <input id="user" value="aman" placeholder="Username" style="width: 120px;" onchange="joinRoom()" /> <select
+      id="room" onchange="joinRoom()">
       <option value="general">#general</option>
       <option value="tech">#tech</option>
       <option value="random">#random</option>
@@ -70,4 +100,5 @@
     joinRoom();
   </script>
 </body>
+
 </html>

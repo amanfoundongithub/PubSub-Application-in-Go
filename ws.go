@@ -3,22 +3,27 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/coder/websocket"
-	"github.com/coder/websocket/wsjson"
 	"log"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/coder/websocket"
+	"github.com/coder/websocket/wsjson"
 )
 
 func (s *Server) wsHandler(w http.ResponseWriter, r *http.Request) {
+	reqID := requestIDFromContext(r.Context())
+
 	if r.Method != http.MethodGet {
+		s.metrics.RecordRequest(http.StatusMethodNotAllowed)
 		http.Error(w, "Only GET method is supported on this handler", http.StatusMethodNotAllowed)
 		return
 	}
 
 	topic := strings.TrimSpace(r.URL.Query().Get("topic"))
 	if topic == "" {
+		s.metrics.RecordRequest(http.StatusBadRequest)
 		http.Error(w, "Please provide a topic parameter in the URL", http.StatusBadRequest)
 		return
 	}
@@ -32,15 +37,20 @@ func (s *Server) wsHandler(w http.ResponseWriter, r *http.Request) {
 		InsecureSkipVerify: true,
 	})
 	if err != nil {
-		log.Printf("WebSocket accept error: %v", err)
+		s.metrics.RecordRequest(http.StatusBadRequest)
+		log.Printf("req_id=%s websocket accept error: %v", reqID, err)
 		return
 	}
 	defer conn.CloseNow()
+
+	s.metrics.RecordRequest(http.StatusSwitchingProtocols)
 
 	subID := fmt.Sprintf("ws-%s-%p", sender, conn)
 	sub, _ := s.broker.Subscribe(topic, subID, sender, 32)
 	past := s.broker.History(topic)
 	defer s.broker.Unsubscribe(topic, subID)
+
+	log.Printf("req_id=%s ws connected topic=%s user=%s", reqID, topic, sender)
 
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
@@ -87,6 +97,7 @@ func (s *Server) wsHandler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			cancel()
 			<-writeDone
+			log.Printf("req_id=%s ws disconnected topic=%s user=%s", reqID, topic, sender)
 			return
 		}
 

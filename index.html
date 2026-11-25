@@ -6,9 +6,10 @@
   <style>
     body { font-family: system-ui, sans-serif; max-width: 600px; margin: 30px auto; padding: 0 16px; }
     #log { background: #1e1e1e; color: #f0f0f0; padding: 12px; height: 320px; overflow-y: auto; border-radius: 6px; font-size: 13px; }
-    .controls { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; }
-    input, select, button { padding: 8px; font-size: 14px; }
+    .controls { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; flex-wrap: wrap; }
+    input, button { padding: 8px; font-size: 14px; }
     #msg { flex: 1; }
+    #roomInput { width: 150px; }
     #count { font-size: 13px; color: #555; margin-left: auto; }
   </style>
 </head>
@@ -16,11 +17,8 @@
   <h2>Go Real-Time Chat</h2>
   <div class="controls">
     <input id="user" value="aman" placeholder="Username" style="width: 120px;" onchange="joinRoom()" />
-    <select id="room" onchange="joinRoom()">
-      <option value="general">#general</option>
-      <option value="tech">#tech</option>
-      <option value="random">#random</option>
-    </select>
+    <input id="roomInput" value="general" placeholder="Room name..." onkeydown="if(event.key==='Enter') joinRoom()" />
+    <button onclick="joinRoom()">Join</button>
     <span id="count">0 online</span>
   </div>
   <pre id="log"></pre>
@@ -34,6 +32,14 @@
     const logEl = document.getElementById("log");
     const msgEl = document.getElementById("msg");
     const countEl = document.getElementById("count");
+    const roomInputEl = document.getElementById("roomInput");
+
+    function getRoomName() {
+      const raw = roomInputEl.value.trim().toLowerCase().replace(/^#/, "");
+      const cleaned = raw || "general";
+      roomInputEl.value = cleaned;
+      return cleaned;
+    }
 
     function joinRoom() {
       if (ws) {
@@ -44,7 +50,8 @@
       countEl.textContent = "0 online";
 
       const user = encodeURIComponent(document.getElementById("user").value.trim() || "anonymous");
-      const room = encodeURIComponent(document.getElementById("room").value);
+      const roomName = getRoomName();
+      const room = encodeURIComponent(roomName);
 
       const socket = new WebSocket("ws://" + location.host + "/ws?topic=" + room + "&user=" + user);
       ws = socket;

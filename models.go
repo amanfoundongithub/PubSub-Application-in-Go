@@ -1,11 +1,11 @@
-package main 
+package main
 
-import(
+import (
 	"sync"
 	"time"
 )
 
-type MessageKind string 
+type MessageKind string
 
 const (
 	KindChat   MessageKind = "chat"

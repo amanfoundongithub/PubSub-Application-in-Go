@@ -9,35 +9,45 @@ import (
 
 func (s *Server) publishHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
+		s.metrics.RecordRequest(http.StatusMethodNotAllowed)
 		http.Error(w, "Publishing endpoint accepts only POST, please use that!", http.StatusMethodNotAllowed)
 		return
 	}
 
 	var req PublishRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.metrics.RecordRequest(http.StatusBadRequest)
 		http.Error(w, "Invalid JSON payload received, please ensure it is give properly!", http.StatusBadRequest)
 		return
 	}
 
 	topic := strings.TrimSpace(req.Topic)
 	if topic == "" {
+		s.metrics.RecordRequest(http.StatusBadRequest)
 		http.Error(w, "Topic name is required", http.StatusBadRequest)
 		return
 	}
 
 	body := strings.TrimSpace(req.Body)
 	if body == "" {
+		s.metrics.RecordRequest(http.StatusBadRequest)
 		http.Error(w, "Message body is required", http.StatusBadRequest)
 		return
 	}
 	if len(body) > maxMessageBodyLen {
+		s.metrics.RecordRequest(http.StatusBadRequest)
 		http.Error(w, "Message body exceeds maximum allowed length", http.StatusBadRequest)
 		return
 	}
 
 	sender := strings.TrimSpace(req.Sender)
+	if sender == "" {
+		sender = "anonymous"
+	}
+
 	s.broker.Publish(NewChatMessage(topic, sender, body))
 
+	s.metrics.RecordRequest(http.StatusAccepted)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
 	fmt.Fprintln(w, `{"status" : "published"}`)
@@ -45,21 +55,26 @@ func (s *Server) publishHandler(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) streamHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
+		s.metrics.RecordRequest(http.StatusMethodNotAllowed)
 		http.Error(w, "Streaming handler accepts only GET method", http.StatusMethodNotAllowed)
 		return
 	}
 
 	topic := strings.TrimSpace(r.URL.Query().Get("topic"))
 	if topic == "" {
+		s.metrics.RecordRequest(http.StatusBadRequest)
 		http.Error(w, "Topic name is required. Add it to URL param `topic`.", http.StatusBadRequest)
 		return
 	}
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
+		s.metrics.RecordRequest(http.StatusInternalServerError)
 		http.Error(w, "Streaming is not supported", http.StatusInternalServerError)
 		return
 	}
+
+	s.metrics.RecordRequest(http.StatusOK)
 
 	subID := fmt.Sprintf("%s-%p", r.RemoteAddr, r)
 	sub, _ := s.broker.Subscribe(topic, subID, "sse-client", 16)

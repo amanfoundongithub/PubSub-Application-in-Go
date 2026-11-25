@@ -34,13 +34,11 @@ func TestPublishEndpointValidationAndDelivery(t *testing.T) {
 	sub, _ := broker.Subscribe("general", "sub-1", "aman", 8)
 	defer broker.Unsubscribe("general", "sub-1")
 
-	// Drain join event.
 	<-sub.Ch
 
 	srv := httptest.NewServer(newMux(broker))
 	defer srv.Close()
 
-	// 1. Invalid JSON should return 400.
 	badResp, err := http.Post(srv.URL+"/publish", "application/json", strings.NewReader("{bad-json"))
 	if err != nil {
 		t.Fatalf("POST /publish bad payload failed: %v", err)
@@ -50,7 +48,6 @@ func TestPublishEndpointValidationAndDelivery(t *testing.T) {
 		t.Fatalf("expected 400 for invalid JSON, got %d", badResp.StatusCode)
 	}
 
-	// 2. Valid publish should deliver to subscriber on "general".
 	payload := `{"topic":"general","sender":"aman","body":"hello via http"}`
 	goodResp, err := http.Post(srv.URL+"/publish", "application/json", bytes.NewBufferString(payload))
 	if err != nil {
@@ -95,15 +92,9 @@ func TestSSEStreamEndpoint(t *testing.T) {
 		t.Fatalf("expected text/event-stream, got %q", resp.Header.Get("Content-Type"))
 	}
 
-	// Give stream handler a moment to register its subscription.
 	time.Sleep(30 * time.Millisecond)
 
-	broker.Publish(Message{
-		Kind:   "chat",
-		Topic:  "news",
-		Sender: "system",
-		Body:   "breaking update",
-	})
+	broker.Publish(NewChatMessage("news", "system", "breaking update"))
 
 	scanner := bufio.NewScanner(resp.Body)
 	foundData := false
@@ -135,12 +126,7 @@ func TestSSEStreamEndpoint(t *testing.T) {
 
 func TestWebSocketHistoryAndBroadcast(t *testing.T) {
 	broker := NewBroker()
-	broker.Publish(Message{
-		Kind:   "chat",
-		Topic:  "room1",
-		Sender: "seed",
-		Body:   "earlier message",
-	})
+	broker.Publish(NewChatMessage("room1", "seed", "earlier message"))
 
 	srv := httptest.NewServer(newMux(broker))
 	defer srv.Close()
@@ -154,7 +140,6 @@ func TestWebSocketHistoryAndBroadcast(t *testing.T) {
 
 	_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
 
-	// Expect history replay first, then join notice.
 	var received []Message
 	for len(received) < 2 {
 		_, raw, err := conn.ReadMessage()
@@ -178,8 +163,7 @@ func TestWebSocketHistoryAndBroadcast(t *testing.T) {
 		t.Fatalf("expected history message 'earlier message' in initial frames, got %+v", received)
 	}
 
-	// Send a message over WebSocket and read it back.
-	if err := conn.WriteJSON(map[string]string{"body": "live ping"}); err != nil {
+	if err := conn.WriteJSON(WSIncomingMessage{Body: "live ping"}); err != nil {
 		t.Fatalf("write json failed: %v", err)
 	}
 

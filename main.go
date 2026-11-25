@@ -1,18 +1,17 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
-	"time"
 	"os/signal"
 	"syscall"
-	"errors"
-	"context"
+	"time"
 )
 
-// Health controller
 func healthHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "For health controller, please use GET method only.", http.StatusMethodNotAllowed)
@@ -34,15 +33,18 @@ func newMux(b *Broker) *http.ServeMux {
 }
 
 func main() {
+	addr := os.Getenv("ADDR")
+	if addr == "" {
+		addr = ":8092"
+	}
 
 	broker := NewBroker()
 	mux := newMux(broker)
 
 	httpServer := &http.Server{
-		Addr: ":8092",
-		Handler: mux,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 10 * time.Second,
+		Addr:        addr,
+		Handler:     mux,
+		ReadTimeout: 10 * time.Second,
 	}
 
 	stop := make(chan os.Signal, 1)
@@ -55,7 +57,7 @@ func main() {
 		}
 	}()
 
-	sig := <- stop
+	sig := <-stop
 	log.Printf("Received signal %s, initiating graceful shutdown...", sig)
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -66,5 +68,4 @@ func main() {
 	}
 
 	log.Println("Server stopped cleanly.")
-
 }

@@ -55,7 +55,9 @@ func (b *Broker) Subscribe(topic, id, user string, buffSize int) (*Subscriber, i
 		b.topics[topic] = make(map[string]*Subscriber)
 	}
 	b.topics[topic][id] = sub
-
+	if b.members == nil {
+		b.members = make(map[string]map[string]string)
+	}
 	if b.members[topic] == nil {
 		b.members[topic] = make(map[string]string)
 	}

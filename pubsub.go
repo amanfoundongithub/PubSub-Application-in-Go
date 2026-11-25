@@ -113,7 +113,15 @@ func (b *Broker) Publish(msg Message) {
 	}
 	b.mu.Unlock()
 
+	b.publishedTotal.Add(1)
+
+	var dropped uint64
 	for _, sub := range targets {
-		sub.Send(msg)
+		if !sub.Send(msg) {
+			dropped++
+		}
+	}
+	if dropped > 0 {
+		b.droppedTotal.Add(dropped)
 	}
 }

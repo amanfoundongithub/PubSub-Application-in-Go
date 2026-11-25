@@ -50,6 +50,7 @@ func(s* Server) wsHandler(w http.ResponseWriter, r *http.Request) {
 
 	subID := fmt.Sprintf("ws-%s-%p", sender, conn)
 	sub := s.broker.Subscribe(topic, subID, 32)
+	past := s.broker.History(topic)
 	defer s.broker.Unsubscribe(topic, subID)
 
 	ctx, cancel := context.WithCancel(r.Context())
@@ -58,6 +59,24 @@ func(s* Server) wsHandler(w http.ResponseWriter, r *http.Request) {
 	writeDone := make(chan struct{})
 	go func() {
 		defer close(writeDone)
+
+		sendOne := func(m Message) bool {
+			writeCtx, writeCancel := context.WithTimeout(ctx, 5*time.Second)
+			err := wsjson.Write(writeCtx, conn, m)
+			writeCancel()
+			if err != nil {
+				cancel()
+				return false
+			}
+			return true
+		}
+		
+		for _, histMsg := range past {
+			if !sendOne(histMsg) {
+				return
+			}
+		}
+
 		for {
 			select {
 			case <- ctx.Done():
@@ -66,17 +85,7 @@ func(s* Server) wsHandler(w http.ResponseWriter, r *http.Request) {
 				if !open {
 					return
 				}
-				out := ChatMessage{
-					Topic : msg.Topic,
-					Sender: sender,
-					Body: msg.Body,
-					SentAt: time.Now().Format(time.RFC3339),
-				}
-				writeCtx, writeCancel := context.WithTimeout(ctx, 5*time.Second)
-				err := wsjson.Write(writeCtx, conn, out)
-				writeCancel()
-				if err != nil {
-					cancel()
+				if !sendOne(msg) {
 					return
 				}
 			}
@@ -96,6 +105,7 @@ func(s* Server) wsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		s.broker.Publish(Message{
 			Topic: topic,
+			Sender: sender,
 			Body: fmt.Sprintf("%s: %s", sender, in.Body),
 		})
 	}

@@ -21,15 +21,17 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, `{"status" : "ok", "service" : "pubsub-chat"}`)
 }
 
-func newMux(b *Broker) *http.ServeMux {
-	s := &Server{broker: b}
+func newMux(b *Broker) http.Handler {
+	s := NewServer(b)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", s.indexHandler)
 	mux.HandleFunc("/health", healthHandler)
+	mux.HandleFunc("/stats", s.statsHandler)
+	mux.HandleFunc("/metrics", s.metricsHandler)
 	mux.HandleFunc("/publish", s.publishHandler)
 	mux.HandleFunc("/stream", s.streamHandler)
 	mux.HandleFunc("/ws", s.wsHandler)
-	return mux
+	return s.withObservability(mux)
 }
 
 func main() {
@@ -39,11 +41,11 @@ func main() {
 	}
 
 	broker := NewBroker()
-	mux := newMux(broker)
+	handler := newMux(broker)
 
 	httpServer := &http.Server{
 		Addr:        addr,
-		Handler:     mux,
+		Handler:     handler,
 		ReadTimeout: 10 * time.Second,
 	}
 

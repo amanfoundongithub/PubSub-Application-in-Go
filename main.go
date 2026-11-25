@@ -17,9 +17,14 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	
+
+	broker := NewBroker()
+	srv := NewServer(broker)
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", healthHandler)
+	mux.HandleFunc("/publish", srv.publishHandler)
+	mux.HandleFunc("/stream", srv.streamHandler)
 
 	addr := ":8092"
 	log.Printf("Starting server on http://localhost%s\n", addr)

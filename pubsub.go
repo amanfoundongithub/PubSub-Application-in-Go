@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"sync"
 	"time"
 )
@@ -40,22 +41,37 @@ func NewBroker() *Broker {
 }
 
 // Subscribe to broker
-func (b *Broker) Subscribe(topic, id string, buffSize int) *Subscriber {
+func (b *Broker) Subscribe(topic, id, user string, buffSize int) (*Subscriber, int) {
 
 	// Create a subscriber
 	sub := &Subscriber{
 		ID: id,
+		User: user,
 		Ch: make(chan Message, buffSize),
 	}
 
 	b.mu.Lock()
-	defer b.mu.Unlock()
-
 	if b.topics[topic] == nil {
 		b.topics[topic] = make(map[string]*Subscriber)
 	}
 	b.topics[topic][id] = sub
-	return sub
+
+	if b.members[topic] == nil {
+		b.members[topic] = make(map[string]string)
+	}
+	b.members[topic][id] = user
+	count := len(b.members[topic])
+	b.mu.Unlock()
+
+	b.Publish(Message{
+		Kind:        "system",
+		Topic:       topic,
+		Sender:      "system",
+		Body:        fmt.Sprintf("%s joined #%s", user, topic),
+		MemberCount: count,
+	})
+
+	return sub, count
 
 }
 

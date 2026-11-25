@@ -15,6 +15,8 @@ type Subscriber struct {
 type Broker struct {
 	mu sync.RWMutex
 	topics map[string]map[string]*Subscriber
+	history map[string][]Message
+	historyLimit int
 }
 
 // Function to make new broker

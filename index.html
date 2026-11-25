@@ -1,55 +1,27 @@
 <!doctype html>
 <html>
-
 <head>
   <meta charset="utf-8">
   <title>Go Pub/Sub Chat</title>
   <style>
-    body {
-      font-family: system-ui, sans-serif;
-      max-width: 600px;
-      margin: 30px auto;
-      padding: 0 16px;
-    }
-
-    #log {
-      background: #1e1e1e;
-      color: #f0f0f0;
-      padding: 12px;
-      height: 320px;
-      overflow-y: auto;
-      border-radius: 6px;
-      font-size: 13px;
-    }
-
-    .controls {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 12px;
-    }
-
-    input,
-    select,
-    button {
-      padding: 8px;
-      font-size: 14px;
-    }
-
-    #msg {
-      flex: 1;
-    }
+    body { font-family: system-ui, sans-serif; max-width: 600px; margin: 30px auto; padding: 0 16px; }
+    #log { background: #1e1e1e; color: #f0f0f0; padding: 12px; height: 320px; overflow-y: auto; border-radius: 6px; font-size: 13px; }
+    .controls { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; }
+    input, select, button { padding: 8px; font-size: 14px; }
+    #msg { flex: 1; }
+    #count { font-size: 13px; color: #555; margin-left: auto; }
   </style>
 </head>
-
 <body>
   <h2>Go Real-Time Chat</h2>
   <div class="controls">
-    <input id="user" value="aman" placeholder="Username" style="width: 120px;" onchange="joinRoom()" /> <select
-      id="room" onchange="joinRoom()">
+    <input id="user" value="aman" placeholder="Username" style="width: 120px;" onchange="joinRoom()" />
+    <select id="room" onchange="joinRoom()">
       <option value="general">#general</option>
       <option value="tech">#tech</option>
       <option value="random">#random</option>
     </select>
+    <span id="count">0 online</span>
   </div>
   <pre id="log"></pre>
   <div class="controls">
@@ -61,6 +33,7 @@
     let ws = null;
     const logEl = document.getElementById("log");
     const msgEl = document.getElementById("msg");
+    const countEl = document.getElementById("count");
 
     function joinRoom() {
       if (ws) {
@@ -68,6 +41,7 @@
         ws.close();
       }
       logEl.textContent = "";
+      countEl.textContent = "0 online";
 
       const user = encodeURIComponent(document.getElementById("user").value.trim() || "anonymous");
       const room = encodeURIComponent(document.getElementById("room").value);
@@ -77,13 +51,21 @@
 
       socket.onmessage = (e) => {
         const data = JSON.parse(e.data);
+        if (typeof data.member_count === "number") {
+          countEl.textContent = `${data.member_count} online`;
+        }
         const time = data.sent_at ? data.sent_at.substring(11, 19) : "";
-        logEl.textContent += `[${time}] ${data.sender}: ${data.body}\n`;
+        if (data.kind === "system") {
+          logEl.textContent += `[${time}] * ${data.body} *\n`;
+        } else {
+          logEl.textContent += `[${time}] ${data.sender}: ${data.body}\n`;
+        }
         logEl.scrollTop = logEl.scrollHeight;
       };
 
       socket.onclose = () => {
         if (ws === socket) {
+          countEl.textContent = "0 online";
           logEl.textContent += "--- Disconnected ---\n";
         }
       };
@@ -100,5 +82,4 @@
     joinRoom();
   </script>
 </body>
-
 </html>

@@ -18,3 +18,8 @@ type Broker struct {
 }
 
 // Function to make new broker
+func NewBroker() *Broker {
+	return &Broker{
+		topics : make(map[string]map[string]*Subscriber),
+	}
+}

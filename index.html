@@ -33,21 +33,29 @@
     const msgEl = document.getElementById("msg");
 
     function joinRoom() {
-      if (ws) ws.close();
+      if (ws) {
+        ws.onclose = null;
+        ws.close();
+      }
       logEl.textContent = "";
 
       const user = encodeURIComponent(document.getElementById("user").value.trim() || "anonymous");
       const room = encodeURIComponent(document.getElementById("room").value);
 
-      ws = new WebSocket("ws://" + location.host + "/ws?topic=" + room + "&user=" + user);
-      ws.onmessage = (e) => {
+      const socket = new WebSocket("ws://" + location.host + "/ws?topic=" + room + "&user=" + user);
+      ws = socket;
+
+      socket.onmessage = (e) => {
         const data = JSON.parse(e.data);
         const time = data.sent_at ? data.sent_at.substring(11, 19) : "";
         logEl.textContent += `[${time}] ${data.sender}: ${data.body}\n`;
         logEl.scrollTop = logEl.scrollHeight;
       };
-      ws.onclose = () => {
-        logEl.textContent += "--- Disconnected ---\n";
+
+      socket.onclose = () => {
+        if (ws === socket) {
+          logEl.textContent += "--- Disconnected ---\n";
+        }
       };
     }
 

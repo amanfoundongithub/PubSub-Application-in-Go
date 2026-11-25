@@ -23,3 +23,23 @@ func NewBroker() *Broker {
 		topics : make(map[string]map[string]*Subscriber),
 	}
 }
+
+// Subscribe to broker
+func(b* Broker) Subscribe(topic, id string, buffSize int) *Subscriber {
+
+	// Create a subscriber
+	sub := &Subscriber{
+		ID: id, 
+		Ch : make(chan Message, buffSize),
+	}
+
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if b.topics[topic] == nil {
+		b.topics[topic] = make(map[string]*Subscriber)
+	}
+	b.topics[topic][id] = sub
+	return sub
+	
+}

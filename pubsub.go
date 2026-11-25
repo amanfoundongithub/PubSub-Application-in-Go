@@ -18,6 +18,7 @@ type Message struct {
 
 type Subscriber struct {
 	ID string
+	User string
 	Ch chan Message
 }
 

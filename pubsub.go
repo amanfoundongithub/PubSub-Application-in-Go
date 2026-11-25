@@ -2,6 +2,8 @@ package main
 
 import "sync"
 
+const defaultHistoryLimit = 20
+
 type Message struct {
 	Topic string `json:"topic"`
 	Body  string `json:"body"`
@@ -22,7 +24,9 @@ type Broker struct {
 // Function to make new broker
 func NewBroker() *Broker {
 	return &Broker{
-		topics : make(map[string]map[string]*Subscriber),
+		topics :      make(map[string]map[string]*Subscriber),
+		history:      make(map[string][]Message),
+		historyLimit: defaultHistoryLimit,
 	}
 }
 

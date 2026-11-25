@@ -40,15 +40,17 @@ func (s *Subscriber) Close() {
 	}
 }
 
-func (s *Subscriber) Send(msg Message) {
+func (s *Subscriber) Send(msg Message) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed {
-		return
+		return false
 	}
 	select {
 	case s.Ch <- msg:
+		return true
 	default:
+		return false
 	}
 }
 

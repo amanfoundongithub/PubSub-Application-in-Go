@@ -25,6 +25,7 @@ func main() {
 	mux.HandleFunc("/health", healthHandler)
 	mux.HandleFunc("/publish", srv.publishHandler)
 	mux.HandleFunc("/stream", srv.streamHandler)
+	mux.HandleFunc("/ws", srv.wsHandler)
 
 	addr := ":8092"
 	log.Printf("Starting server on http://localhost%s\n", addr)

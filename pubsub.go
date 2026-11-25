@@ -41,5 +41,27 @@ func(b* Broker) Subscribe(topic, id string, buffSize int) *Subscriber {
 	}
 	b.topics[topic][id] = sub
 	return sub
+
+}
+
+// Unsubscribe to broker
+func(b* Broker) Unsubscribe(topic, id string) {
+
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	subs, ok := b.topics[topic]
+	if !ok {
+		return
+	}
+
+	if sub, exists := subs[id]; exists {
+		delete(subs, id)
+		close(sub.Ch)
+	}
+
+	if len(subs) == 0 {
+		delete(b.topics, topic)
+	}
 	
 }

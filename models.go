@@ -1,7 +1,9 @@
 package main
 
 import (
+	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -12,7 +14,10 @@ const (
 	KindSystem MessageKind = "system"
 )
 
-const maxMessageBodyLen = 2000
+const (
+	defaultHistoryLimit = 20
+	maxMessageBodyLen   = 2000
+)
 
 type Message struct {
 	Kind        MessageKind `json:"kind"`
@@ -85,14 +90,30 @@ func NewSystemMessage(topic, body string, memberCount int) Message {
 	}
 }
 
-const defaultHistoryLimit = 20
+type Metrics struct {
+	httpRequestsTotal atomic.Uint64
+	httpErrorsTotal   atomic.Uint64
+}
+
+func (m *Metrics) RecordRequest(statusCode int) {
+	m.httpRequestsTotal.Add(1)
+	if statusCode >= 400 {
+		m.httpErrorsTotal.Add(1)
+	}
+}
+
+func (m *Metrics) Snapshot() (requests uint64, errors uint64) {
+	return m.httpRequestsTotal.Load(), m.httpErrorsTotal.Load()
+}
 
 type Broker struct {
-	mu           sync.RWMutex
-	topics       map[string]map[string]*Subscriber
-	members      map[string]map[string]string
-	history      map[string][]Message
-	historyLimit int
+	mu             sync.RWMutex
+	topics         map[string]map[string]*Subscriber
+	members        map[string]map[string]string
+	history        map[string][]Message
+	historyLimit   int
+	publishedTotal atomic.Uint64
+	droppedTotal   atomic.Uint64
 }
 
 func NewBroker() *Broker {
@@ -101,16 +122,6 @@ func NewBroker() *Broker {
 		members:      make(map[string]map[string]string),
 		history:      make(map[string][]Message),
 		historyLimit: defaultHistoryLimit,
-	}
-}
-
-type Server struct {
-	broker *Broker
-}
-
-func NewServer(broker *Broker) *Server {
-	return &Server{
-		broker: broker,
 	}
 }
 
@@ -126,4 +137,61 @@ type BrokerStats struct {
 	PublishedMessages uint64      `json:"published_messages"`
 	DroppedMessages   uint64      `json:"dropped_messages"`
 	Rooms             []RoomStats `json:"rooms"`
+}
+
+func (b *Broker) Stats() BrokerStats {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	topicSet := make(map[string]struct{})
+	for t := range b.topics {
+		topicSet[t] = struct{}{}
+	}
+	for t := range b.members {
+		topicSet[t] = struct{}{}
+	}
+	for t := range b.history {
+		topicSet[t] = struct{}{}
+	}
+
+	rooms := make([]RoomStats, 0, len(topicSet))
+	totalSubs := 0
+
+	for t := range topicSet {
+		subCount := len(b.topics[t])
+		memCount := len(b.members[t])
+		histCount := len(b.history[t])
+		if subCount == 0 && memCount == 0 && histCount == 0 {
+			continue
+		}
+		totalSubs += subCount
+		rooms = append(rooms, RoomStats{
+			Topic:        t,
+			Members:      memCount,
+			HistoryCount: histCount,
+		})
+	}
+
+	sort.Slice(rooms, func(i, j int) bool {
+		return rooms[i].Topic < rooms[j].Topic
+	})
+
+	return BrokerStats{
+		ActiveRooms:       len(rooms),
+		TotalSubscribers:  totalSubs,
+		PublishedMessages: b.publishedTotal.Load(),
+		DroppedMessages:   b.droppedTotal.Load(),
+		Rooms:             rooms,
+	}
+}
+
+type Server struct {
+	broker  *Broker
+	metrics Metrics
+}
+
+func NewServer(broker *Broker) *Server {
+	return &Server{
+		broker: broker,
+	}
 }

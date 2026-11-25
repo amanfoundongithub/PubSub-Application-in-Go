@@ -3,12 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/coder/websocket"
+	"github.com/coder/websocket/wsjson"
 	"log"
 	"net/http"
 	"strings"
 	"time"
-	"github.com/coder/websocket"
-	"github.com/coder/websocket/wsjson"
 )
 
 func (s *Server) wsHandler(w http.ResponseWriter, r *http.Request) {

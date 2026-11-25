@@ -181,3 +181,52 @@ func TestWebSocketHistoryAndBroadcast(t *testing.T) {
 		}
 	}
 }
+
+func TestStatsMetricsAndRequestID(t *testing.T) {
+	broker := NewBroker()
+	broker.Publish(NewChatMessage("general", "aman", "hello stats"))
+
+	srv := httptest.NewServer(newMux(broker))
+	defer srv.Close()
+
+	req, err := http.NewRequest(http.MethodGet, srv.URL+"/stats", nil)
+	if err != nil {
+		t.Fatalf("new request failed: %v", err)
+	}
+	req.Header.Set("X-Request-ID", "test-trace-123")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("GET /stats failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if gotID := resp.Header.Get("X-Request-ID"); gotID != "test-trace-123" {
+		t.Fatalf("expected X-Request-ID test-trace-123, got %q", gotID)
+	}
+
+	var stats BrokerStats
+	if err := json.NewDecoder(resp.Body).Decode(&stats); err != nil {
+		t.Fatalf("decode stats failed: %v", err)
+	}
+	if stats.ActiveRooms != 1 || stats.PublishedMessages != 1 {
+		t.Fatalf("unexpected stats snapshot: %+v", stats)
+	}
+
+	metricsResp, err := http.Get(srv.URL + "/metrics")
+	if err != nil {
+		t.Fatalf("GET /metrics failed: %v", err)
+	}
+	defer metricsResp.Body.Close()
+
+	var bodyBuf bytes.Buffer
+	_, _ = bodyBuf.ReadFrom(metricsResp.Body)
+	body := bodyBuf.String()
+
+	if !strings.Contains(body, "pubsub_published_messages_total 1") {
+		t.Fatalf("expected published counter in metrics, got:\n%s", body)
+	}
+	if !strings.Contains(body, "pubsub_http_requests_total") {
+		t.Fatalf("expected http requests counter in metrics, got:\n%s", body)
+	}
+}
